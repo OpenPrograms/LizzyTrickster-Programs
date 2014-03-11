@@ -90,3 +90,13 @@ elseif WhoAmI == "SLAVE" then
         NameTable = serialization.unserialize( data:sub(-0, 10))
     end
 end
+
+function WittyFunctionNameHere( LAddr, RAddr, P, Dist, Data )
+    if WhoAmI == "MASTER" then
+        if
+end
+
+
+event.listen( "modem_message", WittyFunctionNameHere )
+
+

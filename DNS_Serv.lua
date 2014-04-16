@@ -1,4 +1,4 @@
---[[
+--[[  IN IT'S CURRENT STATE, IT IS NON-FUNCTIONAL. PLEASE DONT ATTEMPT TO USE IT
     Net messages:
         _SERVER => ???:
             B: "DNS WHOMASTER" - broadcasted on port 53, if no response is made within 5s then it assumes master role, else it caches the UUID of

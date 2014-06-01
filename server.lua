@@ -4,6 +4,7 @@
 
 local component = require("component")
 local event = require("event")
+local serial= require("serialization")
 
 local NameTable = { }
 if component.isAvailable( "modem" ) then
@@ -31,9 +32,12 @@ print("I have assumed the role of "..WhoAmI)
 
 function WittyFunctionNameHere( LAddr, RAddr, P, Data )
     if WhoAmI == "MASTER" then
-        if (P==53) and (Data == "DNS WHOMASTER") then
+        if Data == "DNS WHOMASTER" then
             print("Received WHOMASTER query from "..RAddr..". Telling them that I am the master...")
         	m.send(RAddr, P, "IAMMASTER")
+        elseif Data == "DNS GETTABLE" then
+            print(RAddr.." requested NameTable. Sending NameTable...")
+            m.send(RAddr, P, serial.serialize(NameTable) )
         end
     end
 end

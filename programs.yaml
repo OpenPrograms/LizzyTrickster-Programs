@@ -1,3 +1,3 @@
 DNS Serv:
-	/blob/master/DNS_Serv.lua
-	Not functional
+	/blob/master/server.lua
+	DNS Server script, currently in dev

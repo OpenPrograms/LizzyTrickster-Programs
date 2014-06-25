@@ -34,7 +34,7 @@ function WittyFunctionNameHere( LAddr, RAddr, P, Data )
     if WhoAmI == "MASTER" then
         if Data == "DNS WHOMASTER" then
             print("Received WHOMASTER query from "..RAddr..". Telling them that I am the master...")
-        	m.send(RAddr, P, "IAMMASTER")
+            m.send(RAddr, P, "IAMMASTER")
         elseif Data == "DNS GETTABLE" then
             print(RAddr.." requested NameTable. Sending NameTable...")
             m.send(RAddr, P, serial.serialize(NameTable) )
@@ -44,8 +44,8 @@ end
 
 
 while true do
-	_, LAddr, RAddr, P, _, Data = event.pull( "modem_message" )
-	WittyFunctionNameHere( LAddr, RAddr, P, Data)
+    _, LAddr, RAddr, P, _, Data = event.pull( "modem_message" )
+    WittyFunctionNameHere( LAddr, RAddr, P, Data)
 end
 
 

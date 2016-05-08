@@ -1,3 +1,4 @@
+-- I have no idea how this works, it's no even complete thus I'm going to abandon it.
 local API = {
   ["zone"] = 0xA1
   ["direction"] = {

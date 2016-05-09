@@ -4,7 +4,8 @@ si = component.proxy( component.list("sign")() )
 local sides = { bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5 }
 local aspects = { "red", "yellow", "d-yellow", "green" }
 local direct = { "towards", "away"}
- 
+local VERSION = 1 
+-- Not really a solid version number, just allows for easier updating and stuff (remote command can check to see if it's up-to-date)
 ID = si.getValue() -- Sign should be on the font of the MCU and have a 2 digit number on the first line
 if ID == nil then error("No sign, you tit!", 0) end
 ID = ID:sub(1,2)
@@ -31,7 +32,8 @@ while true do
   end
 end
 
-
+-- TODO Restructure the network message so that it has the ID in the first parameter and the extra data in subsequent ones
+-- so like, ID=32, CMD=RED, DATA=12
 Num = 3212
 --[[
 DIR-FROM-INT: 0-3 = South,west,north,east

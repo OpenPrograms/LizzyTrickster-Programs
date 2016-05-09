@@ -1,6 +1,6 @@
 rs = component.proxy( component.list("redstone")() );
 nc = component.proxy( component.list("modem")() );
-si = component.proxy( component.list("sign")() )
+si = component.proxy( component.list("sign")() );
 local sides = { bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5 }
 local aspects = { "red", "yellow", "d-yellow", "green" }
 local direct = { "towards", "away"}

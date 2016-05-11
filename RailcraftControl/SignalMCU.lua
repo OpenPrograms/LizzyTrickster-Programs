@@ -22,12 +22,12 @@ while true do
     e,l,r,p,d,m = decodeNetwork( table.unpack( a ) ) -- Parameters: EventName, LocalAddress, RemoteAddress, Port, Distance, Message
     if m[1]:sub(1,2) == ID then -- m[1] will be a number represented in string form like "3212"
       dir,asp = tonumber(m[1]:sub(3,3)), tonumber( m[1]:sub(4,4) )
-      if dir == 1 then
+      if dir == 2 then
         rs.setOutput(sides.right, asp )
-      elseif dir == 0 then
+      elseif dir == 1 then
         rs.setOutput(sides.left, asp )
       end
-      si.setValue( string.format("%s\nLast Message\n%q\n%q", ID, direct[dir+1], aspects[asp] ) )
+      si.setValue( string.format("%s\nLast Message\n%q\n%q", ID, direct[dir], aspects[asp] ) )
     end
   end
 end
@@ -41,3 +41,34 @@ ZONE-BARRIER#: 1-whatever (only used for sections inside the facility, probably)
 DIR-OF-TRVL: 0=towards, 1=away
 ASPECT: 1-4 = most2least restrictive (this is redstone strength, if its 0, the signal will be flashing red+yel)
 ]]
+
+local RS = component.proxy( component.list("redstone")() )
+local NC = component.proxy( component.list("modem")() )
+local SI = component.proxy( component.list("sign")() )
+local Sides = { bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5 }
+local Aspects = { red = 4, yellow = 3, dyellow = 2, green = 1}
+local Direction = { "Towards", "Away" } -- only used for sign stuffs
+local EEPROM = component.proxy( component.list("eeprom")() )
+local ChkSum = EEPROM.getChecksum()
+local EData = EEPROM.getData()
+local ID
+if #EData >= 2 then
+    ID = EData:sub(1,2)
+elseif SI.getValue() ~= nil then
+    ID = SI.getValue():sub(1,2)
+else
+    error("No ID Stored and no Sign!", 0)
+end
+
+NC.open(2222)
+function decodeNetwork( e, l, r, p, d, ... )
+    local excess = table.pack( ... )
+    return e, l, r, p, d, excess
+    -- Maybe have excess split out to be ID, CMD, Excess?
+end
+
+function updateSignal( D, S ) -- Direction (passed as a side from above) : Strength (passed as an aspect)
+    RS.setOutput(D, S) 
+end
+
+

@@ -3,24 +3,22 @@
 local event = require("event")
 local component = require("component")
 local SignalNetwork = component.proxy( component.get("") )
+SignalNetwork.open(2223)
 local ManagementNetwork = component.proxy( component.get("") )
 local ID = 0
 local InPort, OutPort = 2223, 2222
-local SignalMap = {
-  [A] = { 
-      [99] = {Ad = "SomeID", As = {1, 1} } 
-  },
-  [B] = {  },
-  [C] = {  },
-  [D] = {  }
-  -- Should I make these use A, B, C & D instead? will be less likely that it gets confused with the string numbers and i
-  -- can also do stuff like `SignalMap.A.something`
+local SignalMap = { A = { }, B = { }, C = { }, D = { } }
 
-}
-
-function AspectListener( EventName, Address, SignalName, Aspect) -- Not 100% on this currently, need to test in game first
-  print( "poop" )
-  -- This is gonna need a fair bit of logic :s
+function AspectListener( EventName, Address, SignalName, Aspect)
+    print( "SignalName: ", SignalName, "Aspect", Aspect )
+    local Dir, Gate, TA = SignalName:sub(1,1), SignalName:sub(2,2), SignalName:sub(3,3)
+    print( Dir, Gate, TA )
+    SignalMap[ Dir ][ tonumber( Gate ) ]["As"][ TA ] = Aspect
+    if Aspect == 1 then jkl = 4 else jkl = 1 end
+    print( "JKL", jkl )
+    SignalNetwork.send( SignalMap[ Dir ][ tonumber( Gate ) ].Ad, 2222, Dir..Gate, 1, TA..tostring(jkl) )
+    -- This is gonna need a fair bit of logic :s
+    -- TODO LOGIC!
 end
 
 function ReplySend( LA, RA, ID, CM, Data )
@@ -28,51 +26,28 @@ function ReplySend( LA, RA, ID, CM, Data )
     N.send( RA, OutPort, ID, CM, Data )
 end
 
-
 function NetworkMessage( EventName, LocalAddr, RemoteAddr, Port, Distance, ...)
-  if LocalAddr == SignalNetwork.address then
-    local Data = table.pack( ... )
-    -- This section will be for the MCUs sending messages like for instance on startup or 
-    -- firmware upgrade
-    Src, Cmd = Data[1], Data[2]
-    local D, I = Src:sub(1,1), Src:sub(2,2)
-    if Cmd == 0 then
-        if SingalMap[D][I] == nil then
-            SignalMap[D][I] = {Ad = RemoteAddr, As = {1,1}}
-            ReplySend( LocalAddr, RemoteAddr, Src, 1, "11")
-            ReplySend( LocalAddr, RemoteAddr, Src, 1, "21")
-            -- TODO: convert the above to a proper function
+    if LocalAddr == SignalNetwork.address then
+        local Data = table.pack( ... )
+        -- This section will be for the MCUs sending messages like for instance on startup or 
+        -- firmware upgrade
+        Src, Cmd = Data[1], Data[2]
+        local D, I = Src:sub(1,1), tonumber(Src:sub(2,2)) --TODO Find a more efficient way of doing this
+        if Cmd == 0 then
+--            if SingalMap[D][I] == nil then -- FIXME
+                SignalMap[D][I] = {Ad = RemoteAddr, As = {1,1}}
+                ReplySend( LocalAddr, RemoteAddr, Src, 1, "11")
+                ReplySend( LocalAddr, RemoteAddr, Src, 1, "21")
+                -- TODO: convert the above to a proper function
+--            end
+        elseif Cmd == 3 then
+            ReplySend( LocalAddr, RemoteAddr, Src, 2, LocalAddr )
+
         end
-    elseif Cmd == 3 then
-        ReplySend( LocalAddr, RemoteAddr, Src, 2, LocalAddr )
-
+    elseif LocalAddr == ManagementNetwork.address then
+        print("boo")
+        -- communication with the other management devices
     end
-  elseif LocalAddr == ManagementNetwork.address then
-    print("boo")
-    -- communication with the other management devices
-6end
 end
---[[
-  Should probably put this into a Markdown Document
-  Cmd/MessageID index, sorta
-  0: Client2Server-B - Generic 'hello' meessage, used to notify the server it exists
-  - Parameters: Empty String
-  1: Server2Client-U - Aspect update message, used in general and also to get an mcu up to speed after it's added
-  - Parameters: String in the format "[AT][1-4]": A/T = Away/Towards, 1-4 = aspect. 
-  2: Server2Client-U - "I am master", used to tell MCUs of which address to listen to for aspect updates
-  - Parameters: String UUID of the Network card connected to the MCUs
-  3: Client2Server-B - "Where master?", used for MCUs that have lost the master server, server should respond with 2
-  - Parameters: String UUID of the MCU's netowrk card address
-  4: Server2Clients-B - Update available notification, MCUs should wait a short period before sending a 5
-  - Parameters: Checksum of the update, should match what it can get from EEPROM.getChecksum()
-  5: Client2Server-U - Can haz update?
-  - Parameters: Checksum of the EEPROM: used server side to tell the MCU if it needs the update or not
-  6: Server2Client-U - here (may or may not) be the update!, EEPROMs are 4096 bytes in size, default max net messages are 8192 bytes
-  - Parameters: the update string, MCUs should then set() this to their EEPROMs and reboot.
-  7: Client2Server-U - Update Complete -- Remove? not really needed because the server will send out updates regardless of whether an MCU is connected or not
-  8: Any2Any-U - PING! sent from either mcu to server or visaversa, never from mcu to mcu
-  9: Same2AsAbove-U PONG! the response to 8
-
-]]
-
-ll = "aspect_changed Address Name Aspect"
+event.listen( "modem_message", NetworkMessage )
+event.listen( "aspect_changed", AspectListener )

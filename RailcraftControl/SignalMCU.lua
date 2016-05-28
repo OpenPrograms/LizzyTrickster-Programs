@@ -23,17 +23,14 @@ elseif SI.getValue() ~= nil then
     ID = SI.getValue():sub(1,2)
 else
     error("No ID Stored and no Sign!", 0)
-end
--- TODO Optimize the above and below
+end-- TODO Optimize the above and below
 if string.match(ID, '^[A-D][1-9]') == nil then
     error( "Uhoh, your ID should be like [A-D][1-9]", 0)
 end
-
 function decodeNetwork( e, l, r, p, d, ... )
     local I, C, D = ... 
     return l, r, p, I, C, D
 end
-
 local Mstr = string.match( EData:sub(3), "^"..Pat)
 NC.open(2222)
 NC.broadcast(OutP, ID, 0, "")
@@ -63,8 +60,14 @@ while running do
     local a = table.pack( computer.pullSignal() )
     if a[1] == "modem_message" then
         l, r, p, I, C, D = decodeNetwork( table.unpack( a ) )
-        if C == 1 then
-            updateSignal( D:sub(1,1), D:sub(2,2) )
+        if I == ID then
+            if C == 1 then
+                updateSignal( D:sub(1,1), D:sub(2,2) )
+            elseif C == 8 then
+                NC.send( r, OutPort, ID, 9, "PONG!")
+            end
+        elseif I == "X1" then
+            computer.beep(2000,0.1)
         end
     end
 end

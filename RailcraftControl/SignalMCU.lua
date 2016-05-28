@@ -42,16 +42,24 @@ DIR-OF-TRVL: 0=towards, 1=away
 ASPECT: 1-4 = most2least restrictive (this is redstone strength, if its 0, the signal will be flashing red+yel)
 ]]
 
+--[[ New Structure: ID, CMD, DATA; e.g. B2, 0, "" ]]
+
 local RS = component.proxy( component.list("redstone")() )
 local NC = component.proxy( component.list("modem")() )
 local SI = component.proxy( component.list("sign")() )
+
 local Sides = { bottom = 0, top = 1, back = 2, front = 3, right = 4, left = 5 }
 local Aspects = { red = 4, yellow = 3, dyellow = 2, green = 1}
 local Direction = { "Towards", "Away" } -- only used for sign stuffs
+
+local Pat = "%x%x%x%x%x%x%x%x%-%x%x%x%x%-4%x%x%x%-[89abAB]%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x"
+local OutP = 2223
+
 local EEPROM = component.proxy( component.list("eeprom")() )
 local ChkSum = EEPROM.getChecksum()
 local EData = EEPROM.getData()
 local ID
+
 if #EData >= 2 then
     ID = EData:sub(1,2)
 elseif SI.getValue() ~= nil then
@@ -60,11 +68,32 @@ else
     error("No ID Stored and no Sign!", 0)
 end
 
-NC.open(2222)
+if string.match(ID, '^[A-D][1-9]]') == nil then
+    error( "Uhoh, your ID should be like [A-D][1-9]", 0)
+end
+
 function decodeNetwork( e, l, r, p, d, ... )
-    local excess = table.pack( ... )
-    return e, l, r, p, d, excess
-    -- Maybe have excess split out to be ID, CMD, Excess?
+    local I, C, D = table.unpack(arg)
+    return l, r, p, d, I, C, D
+end
+
+local Mstr = string.match( EData:sub(3), "^"..Pat)
+NC.open(2222)
+
+if Mstr == nil then
+    NC.broadcast(OutP, ID, 0, "")
+    NC.broadcast(OutP, ID, 3, NC.address)
+end
+while true do
+    local a = table.pack( computer.pullSignal() )
+    if a[1] == "modem_message" then
+        local l,r,p,d,I,C,D = decodeNetwork( table.unpack( a ) )
+        if C == 2 then
+            Mstr = tostring(r)
+            EEPROM.setData( ID..Mstr )
+            break
+        end
+    end
 end
 
 function updateSignal( D, S ) -- Direction (passed as a side from above) : Strength (passed as an aspect)

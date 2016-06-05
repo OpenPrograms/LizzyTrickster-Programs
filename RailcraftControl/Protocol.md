@@ -21,6 +21,6 @@ Cmd/MessageID index, sorta
 7: Client2Server-U - Update Complete -- Remove? not really needed because the server will send out updates regardless of whether an MCU is connected or not
 8: Any2Any-U - PING! sent from either mcu to server or visaversa, never from mcu to mcu
 9: Same2AsAbove-U PONG! the response to 8
-
+10: Server2Client
 
 

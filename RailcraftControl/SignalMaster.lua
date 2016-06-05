@@ -4,10 +4,13 @@ local event = require("event")
 local component = require("component")
 local SignalNetwork = component.proxy( component.get("") )
 SignalNetwork.open(2223)
+SignalNetwork.broadcast( 2222, "X1", )
 local ManagementNetwork = component.proxy( component.get("") )
 local ID = 0
 local InPort, OutPort = 2223, 2222
+
 local SignalMap = { A = { }, B = { }, C = { }, D = { } }
+
 
 function AspectListener( EventName, Address, SignalName, Aspect)
     print( "SignalName: ", SignalName, "Aspect", Aspect )

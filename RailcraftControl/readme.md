@@ -10,3 +10,6 @@ The following is a list of parts and their working/completed state:
 - [ ] RITRP
 - [x] SignalControl
 - [ ] TrainAutomation
+
+
+This code is unlikely to be worked on much more as the motivation I had for it has now all gone.

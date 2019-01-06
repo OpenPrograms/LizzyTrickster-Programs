@@ -176,10 +176,11 @@ function signal.new (signal_id, redstone_comp, side, upstream_signal_id, block_i
         d( s({OR=o.override, Si=o.rSide, GG=o.getRedVals(o.state)}) )
         if o.override then 
             o.redstone.setBundledOutput(o.rSide, o.getRedVals(o.aspects.DANGER)) 
+            computer.pushSignal("X-AspectChanged", o.id, o.aspects.DANGER, true)
         else
-            d( s(o.redstone.setBundledOutput(o.rSide, o.getRedVals(o.state))) )
+            o.redstone.setBundledOutput(o.rSide, o.getRedVals(o.state))
+            computer.pushSignal("X-AspectChanged", o.id, o.state, true)
         end
-        computer.pushSignal("X-AspectChanged", o.id, o.state, true) -- notify other signals we changed
     end
 
     o.handleAspect = function(event_name, signal_id, aspect, is_local)

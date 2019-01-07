@@ -1,6 +1,8 @@
 local component = require("component")
 local event = require("event")
 
+local larcs_common = require("larcs/common")
+
 local aspects = {
     "DANGER",
     "CAUTION",
@@ -11,9 +13,6 @@ local aspects = {
     PRE_CAUTION = 3,
     CLEAR = 4
 }
-
-local BLOCK_UPDATE_SIGNAL = "X-BlockUpdate"
-local ASPECT_UPDATE_SIGNAL = "X-AspectChanged"
 
 local signal = {aspects = aspects}
 
@@ -42,17 +41,17 @@ function signal.new (signal_id, redstone_comp, side, upstream_signal_id, block_i
     o.updateAspect = function() 
         if o.override then 
             o.redstone.setBundledOutput(o.rSide, o.getRedVals(o.aspects.DANGER)) 
-            event.push("X-AspectChanged", o.id, o.aspects.DANGER, true)
+            event.push(larcs_common.AspectEventName, o.id, o.aspects.DANGER, true)
         else
             o.redstone.setBundledOutput(o.rSide, o.getRedVals(o.state))
-            event.push("X-AspectChanged", o.id, o.state, true)
+            event.push(larcs_common.AspectEventName, o.id, o.state, true)
         end
     end
 
     o.handleAspect = function(event_name, signal_id, aspect, is_local)
-        if event_name ~= ASPECT_UPDATE_SIGNAL then d("WRONG EVENT SIGNAL") return end
-        if signal_id == o.id then d("it's me") return end -- don't need to update for ourselves
-        if signal_id ~= o.upstream then d("NOTMYUPSTREM") return end -- if it's not our upstream, we dont care
+        if event_name ~= larcs_common.AspectEventName then return end
+        if signal_id == o.id then return end -- don't need to update for ourselves
+        if signal_id ~= o.upstream then return end -- if it's not our upstream, we dont care
         if signal_id == o.upstream then -- sanity check
             if aspect == 4 then -- if it's already CLEAR upstream, we don't need to do any math
                 o.state = 4
@@ -65,8 +64,8 @@ function signal.new (signal_id, redstone_comp, side, upstream_signal_id, block_i
     end
 
     o.handleBlockUpdate = function(event_name, block_id, occupied, is_local)
-        if event_name ~= BLOCK_UPDATE_SIGNAL then d("WRONG EVENT BLOCK") return end
-        if block_id ~= o.block then d("NOTMYBLOCK") return end
+        if event_name ~= larcs_common.BlockEventName then return end
+        if block_id ~= o.block then return end
         if occupied then
             o.override = true
         else
@@ -74,8 +73,8 @@ function signal.new (signal_id, redstone_comp, side, upstream_signal_id, block_i
         end
         o.updateAspect()
     end
-    o._blockEvent = event.listen(BLOCK_UPDATE_SIGNAL, o.handleBlockUpdate)
-    o._aspectEvent = event.listen(ASPECT_UPDATE_SIGNAL, o.handleAspect)
+    o._blockEvent = event.listen(larcs_common.BlockEventName, o.handleBlockUpdate)
+    o._aspectEvent = event.listen(larcs_common.AspectEventName, o.handleAspect)
     -- should set up other variables here, also event handler functions
     o.updateAspect()
     return o

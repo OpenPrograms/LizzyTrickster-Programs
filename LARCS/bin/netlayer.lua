@@ -20,13 +20,13 @@ local function broad (message_id, data, ext_data)
 end
 
 local function handleNetworkMessages (event_name, l_addr, r_addr, port, dist, ...)
-	if event_name ~= "network_message" then return end
+	if event_name ~= "modem_message" then return end
 	if port ~= larcs_common.NetworkPort then return end
 	-- {"LARCS", "**_UPDATE", "{{DATA}}", "_extData"}
 	local args = {...}
 	if args[1] ~= "LARCS" then return end -- not a LARCS message? Don't care
 	local message_id = args[2]
-	local net_args = serial.unserialize(args[2])
+	local net_args = serial.unserialize(args[3])
 
 	if message_id == larcs_common.AspectNetworkID then
 		for signal_id, aspect in pairs(net_args) do
@@ -37,7 +37,7 @@ local function handleNetworkMessages (event_name, l_addr, r_addr, port, dist, ..
 	elseif message_id == larcs_common.BlockNetworkID then
 		for block, occupied in pairs(net_args) do
 			if type(occupied) == "boolean" then
-				event.push(larcs_common.AspectEventName, block, occupied, false)
+				event.push(larcs_common.BlockEventName, block, occupied, false)
 			end
 		end
 	end

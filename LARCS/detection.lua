@@ -1,9 +1,25 @@
 local larcs_common = require("larcs/common")
 local event = require("event")
 
-local function sendTrainDetails () return end
+local detectors = require("/etc/larcs/detectors")
 
-local function handleTrainOverhead () return end
+local modem = require("component").modem
+
+local function sendTrainDetails (aug_address, data1, data2)
+	
+	local detector_details = serial.serialize(detectors[aug_address])
+	modem.broadcast(larcs_common.NetworkPort, larcs_common.TrainNetworkID, )
+end
+
+local function handleTrainOverhead (event_name, augment_address, stock_uuid, data) 
+	if event_name ~= "ir_train_details" then return end
+	local dt = serial.serialize(data)
+	if stock_uuid == "NONE" then
+		sendTrainDetails(augment_address, nil, "EOT") -- End Of Train
+	else
+		sendTrainDetails(augment_address, stock_uuid, dt)
+	end
+end
 
 
 

@@ -1,5 +1,4 @@
 -- TODO list
--- handle local events and convert remote events
 -- Possibly have some form of state information so that each 'node' knows who it needs to be sending updates to?
 
 

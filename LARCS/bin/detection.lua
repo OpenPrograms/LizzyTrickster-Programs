@@ -1,14 +1,17 @@
 local larcs_common = require("larcs/common")
 local event = require("event")
+local serial = require("serialization")
+local component = require("component")
+local computer = require("computer")
 
-local detectors = require("/etc/larcs/detectors")
+local detectors = dofile("/etc/larcs/detectors")
 
 local modem = require("component").modem
 
 local function sendTrainDetails (aug_address, data1, data2)
 	
-	local detector_details = serial.serialize(detectors[aug_address])
-	modem.broadcast(larcs_common.NetworkPort, larcs_common.TrainNetworkID, )
+	local detector_details = serial.serialize(detectors[aug_address]) -- todo work out some way for 
+	modem.broadcast(larcs_common.NetworkPort, larcs_common.TrainNetworkID, detector_details, data1, data2)
 end
 
 local function handleTrainOverhead (event_name, augment_address, stock_uuid, data) 
@@ -29,8 +32,8 @@ local function getTrainDetails ( event_name, augment_address, augment_type, stoc
         if stock_uuid == nil then 
             computer.pushSignal("ir_train_details", augment_address, "NONE", {})
         else
-            local inf   = component.ir_augment_detector.info()
-            local const = component.ir_augment_detector.consist()
+            local inf   = component.proxy(augment_address).info()
+            local const = component.proxy(augment_address).consist()
             --directiom, cars, weight_kg, speed_km. from consist()
             --ag, speed, name from info()
             -- {stock_uuid, info.direction, speed, tag, {throttle=throttle or -42, brake = brake or -42}}

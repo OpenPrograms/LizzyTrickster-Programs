@@ -7,7 +7,7 @@ local com = { -- Stuff here subject to possible change
 	BlockEventName = "larcs-block_update",
 	BlockNetworkID = "BLOCK_UPDATE",
 
-	TrainNetworkID = "",
+	TrainNetworkID = "TRAIN_DETECTED",
 
 	NetworkPort = 564
 }

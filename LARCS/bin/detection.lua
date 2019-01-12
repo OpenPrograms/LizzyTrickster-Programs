@@ -9,19 +9,19 @@ local detectors = dofile("/etc/larcs/detectors")
 local modem = require("component").modem
 
 local function sendTrainDetails (aug_address, data1, data2)
-	
-	local detector_details = serial.serialize(detectors[aug_address]) -- todo work out some way for 
-	modem.broadcast(larcs_common.NetworkPort, larcs_common.TrainNetworkID, detector_details, data1, data2)
+
+    local detector_details = serial.serialize(detectors[aug_address])
+    modem.broadcast(larcs_common.NetworkPort, larcs_common.TrainNetworkID, detector_details, data1, data2)
 end
 
 local function handleTrainOverhead (event_name, augment_address, stock_uuid, data) 
-	if event_name ~= "ir_train_details" then return end
-	local dt = serial.serialize(data)
-	if stock_uuid == "NONE" then
-		sendTrainDetails(augment_address, nil, "EOT") -- End Of Train
-	else
-		sendTrainDetails(augment_address, stock_uuid, dt)
-	end
+    if event_name ~= "ir_train_details" then return end
+    --local dt = serial.serialize(data)
+    if stock_uuid == "NONE" then
+        sendTrainDetails(augment_address, nil, "EOT") -- End Of Train
+    else
+        sendTrainDetails(augment_address, stock_uuid, data)
+    end
 end
 
 
@@ -38,15 +38,15 @@ local function getTrainDetails ( event_name, augment_address, augment_type, stoc
             --ag, speed, name from info()
             -- {stock_uuid, info.direction, speed, tag, {throttle=throttle or -42, brake = brake or -42}}
             local data = {
-            				tag=inf.tag, 
-            				throttle=inf.throttle or false, 
-            				brake=inf.brake or false, 
-            				cars=const.cars, 
-            				name=inf.name,
-            				speed=inf.speed,
-            				direction=inf.direction
-            			}
-            computer.pushSignal("ir_train_details", augment_address, stock_uuid, data )
+                            tag=inf.tag,
+                            throttle=inf.throttle or false, 
+                            brake=inf.brake or false, 
+                            cars=const.cars, 
+                            name=inf.name,
+                            speed=math.floor(inf.speed),
+                            direction=inf.direction
+                        }
+            computer.pushSignal("ir_train_details", augment_address, stock_uuid, serial.serialize(data) )
         end
     end
 end

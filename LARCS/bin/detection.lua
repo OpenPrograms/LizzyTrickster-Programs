@@ -10,7 +10,7 @@ local modem = require("component").modem
 
 local function sendTrainDetails (aug_address, data1, data2)
 
-    local detector_details = serial.serialize(detectors[aug_address])
+    local detector_details = serial.serialize({[aug_address]=detectors[aug_address]})
     modem.broadcast(larcs_common.NetworkPort, larcs_common.TrainNetworkID, detector_details, data1, data2)
 end
 

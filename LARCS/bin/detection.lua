@@ -4,7 +4,7 @@ local serial = require("serialization")
 local component = require("component")
 local computer = require("computer")
 
-local detectors = dofile("/etc/larcs/detectors")
+local detectors = dofile("/etc/larcs/detectors") -- do we actually need this?
 
 local modem = require("component").modem
 

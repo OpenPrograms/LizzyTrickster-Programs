@@ -10,8 +10,11 @@ local modem = require("component").modem
 
 local function sendTrainDetails (aug_address, data1, data2)
 
-    local detector_details = serial.serialize({[aug_address]=detectors[aug_address]})
+    local dt =  { [aug_address]=detectors[aug_address] or {Pos={-0, -0}} }
+    local detector_details = serial.serialize( dt )
     modem.broadcast(larcs_common.NetworkPort, larcs_common.TrainNetworkID, detector_details, data1, data2)
+    -- sends something like this:
+    -- "{['long-UUID-here']={-42,-42}}", "theUUID-of-the-train-here", "{Stuff from data table in getTrainDetails or EOT}"
 end
 
 local function handleTrainOverhead (event_name, augment_address, stock_uuid, data) 

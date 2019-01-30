@@ -12,7 +12,13 @@ local function sendTrainDetails (aug_address, data1, data2)
 
     local dt =  { [aug_address]=detectors[aug_address] or {Pos={-0, -0}} }
     local detector_details = serial.serialize( dt )
-    modem.broadcast(larcs_common.NetworkPort, larcs_common.TrainNetworkID, detector_details, data1, data2)
+    local data = ""
+    if data1 ~= nil then
+        data = serial.serialize( {[data1]=data2} )
+    else
+        data = "EOT"
+    end
+    modem.broadcast(larcs_common.NetworkPort, "LARCS", larcs_common.TrainNetworkID, detector_details, data)
     -- sends something like this:
     -- "{['long-UUID-here']={-42,-42}}", "theUUID-of-the-train-here", "{Stuff from data table in getTrainDetails or EOT}"
 end

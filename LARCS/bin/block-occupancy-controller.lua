@@ -32,6 +32,10 @@ function getBlock (detector_id) -- returns block ID and entry (true) or exit (fa
     return "NANA", false
 end
 
+function sendBlockUpdate (block, occupied)
+    event.push(larcs_common.BlockEventName, block, occupied, true) 
+end
+
 function handleIncomingNetwork (event_name, l_addr, r_addr, port, dist, ...)
     if event_name ~= "modem_message" then return end
     
@@ -52,7 +56,7 @@ function handleIncomingNetwork (event_name, l_addr, r_addr, port, dist, ...)
     if block_id == "NANA" and entering == false then return end
 
     if GLOBAL_STATE[block_id] == nil then 
-        GLOBAL_STATE[block_id] = {trains_in_block=new_fifo():setempty(function() return nil end)} 
+        GLOBAL_STATE[block_id] = {trains_in_block=new_fifo():setempty(function() return nil end), state=0} 
     end
 
     if args[4] == nil then 
@@ -92,4 +96,11 @@ function handleIncomingNetwork (event_name, l_addr, r_addr, port, dist, ...)
         end
     end
 
-    -- continue with processing here
+    if #GLOBAL_STATE[block_id].trains_in_block > 0 and GLOBAL_STATE[block_id].state == 0 then
+        GLOBAL_STATE[block_id].state = 1
+        sendBlockUpdate(block_id, true)
+    elseif #GLOBAL_STATE[block_id].trains_in_block == 0 and GLOBAL_STATE[block_id].state == 1 then
+        GLOBAL_STATE[block_id].state = 0
+        sendBlockUpdate(block_id, false)
+    end
+end

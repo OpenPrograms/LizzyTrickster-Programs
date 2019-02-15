@@ -15,7 +15,8 @@ local new_fifo = require("fifo")
 -- can use ETAG to check if it's newer or not, may need to use base internet component cause the internet library seems crap
 
 function log (level, message)
-    print(level, message)
+    --print(level, message)
+    return
 end
 
 local GLOBAL_STATE = {}
@@ -104,3 +105,5 @@ function handleIncomingNetwork (event_name, l_addr, r_addr, port, dist, ...)
         sendBlockUpdate(block_id, false)
     end
 end
+
+print("network event listener registered!: "..event.listen("modem_message", handleIncomingNetwork))

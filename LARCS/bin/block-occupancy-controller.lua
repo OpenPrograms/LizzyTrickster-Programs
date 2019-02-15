@@ -65,15 +65,15 @@ function handleIncomingNetwork (event_name, l_addr, r_addr, port, dist, ...)
     elseif args[4] == "EOT" then
         if entering then
             GLOBAL_STATE[block_id].trains_in_block:push( "EOT" )
-        else:
+        else
             local value, exists = GLOBAL_STATE[block_id].trains_in_block:peek()
             if exists then
                 if value ~= "EOT" then
                     log("WARN", "Expected to pull EOT from "..block_id.."'s queue but I got "..value.."!")
-                else:
+                else
                     GLOBAL_STATE[block_id].trains_in_block:pop()
                 end
-            else:
+            else
                 log("WARN", "Received EOT but there was no more entries to pull!")
             end
         end
@@ -82,16 +82,16 @@ function handleIncomingNetwork (event_name, l_addr, r_addr, port, dist, ...)
         if entering then
             GLOBAL_STATE[block_id].trains_in_block:push( stock_data.ID )
             log("INFO", stock_data.ID.." entered "..block_id.."!")
-        else: --exiting
+        else --exiting
             local value, exists = GLOBAL_STATE[block_id].trains_in_block:peek()
             if exists then
                 if value ~= stock_data.ID then
                     log("WARN", stock_data.ID.." unexectedly left "..block_id..".. Did the order change?")
-                else:
+                else
                     GLOBAL_STATE[block_id].trains_in_block:pop()
                     log("INFO", value.." left block "..block_id)
                 end
-            else:
+            else
                 log("WARN", "Ran out of values to extract from "..block_id.."'s FIFO queue?")
             end
         end

@@ -60,17 +60,23 @@ local function createMesh(host,port,addr)
 
     function proxy.read(event, cardId, connectionId)
         local rb, r
-        local rt = 0
+        local buffer = ""
         while true do
             rb,r = proxy.socket.read(4096)
-            if rb or rt > 10 then break end
             if type(rb) == "nil" then
                 proxy.connect()
             end
-            rt = rt + 1
+            if #rb == 0 and #buffer == 0 then
+                -- Buffer empty and no actual data, return early
+                return
+            end
+            buffer = buffer..rb
+            if #buffer > 0 and #rb == 0 then
+                break
+            end
         end
-        if #rb > 0 then
-            for dataline in string.gmatch(rb, '([^'.."\n"..']+)') do
+        if #buffer > 0 then
+            for dataline in string.gmatch(buffer, '([^'.."\n"..']+)') do
                 data = json.decode(dataline)
                 if data['type'] == "DATA" then
                     computer.pushSignal("modem_message", addr, data['s'], data['p'], 0, data['D']['d1'], data['D']['d2'], data['D']['d3'], data['D']['d4'], data['D']['d5'], data['D']['d6'], data['D']['d7'], data['D']['d8'])

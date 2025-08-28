@@ -47,7 +47,7 @@ local function createMesh(host,port,addr)
     end
     function proxy.send(dest, port, d1,d2,d3,d4,d5,d6,d7,d8)
         rt = 0
-        data_to_send = {type="DATA", s=proxy.address, d=dest, p=port, D=serial.serialize({d1,d2,d3,d4,d5,d6,d7,d8}) } -- stupid table.pack / serialization issues
+        data_to_send = {type="DATA", s=proxy.address, d=dest, p=port, D={d1=d1,d2=d2,d3=d3,d4=d4,d5=d5,d6=d6,d7=d7,d8=d8} } -- stupid table.pack / serialization issues
         while not proxy.socket.write(json.encode(data_to_send).."\n") and rt < 10 do
             proxy.connect()
             rt = rt + 1
@@ -73,7 +73,7 @@ local function createMesh(host,port,addr)
             for dataline in string.gmatch(rb, '([^'.."\n"..']+)') do
                 data = json.decode(dataline)
                 if data['type'] == "DATA" then
-                    computer.pushSignal("modem_message", addr, data['s'], data['p'], 0, table.unpack(serial.unserialize(data['D'])))
+                    computer.pushSignal("modem_message", addr, data['s'], data['p'], 0, data['D']['d1'], data['D']['d2'], data['D']['d3'], data['D']['d4'], data['D']['d5'], data['D']['d6'], data['D']['d7'], data['D']['d8'])
                 end
                 proxy.last = computer.uptime()
             end
@@ -172,4 +172,3 @@ function delpeer(n)
     savecfg()
     print(string.format("Removed peer %s:%d",dp.host, dp.port))
 end
-

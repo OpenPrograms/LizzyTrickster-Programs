@@ -80,6 +80,8 @@ local function createMesh(host,port,addr)
                 data = json.decode(dataline)
                 if data['type'] == "DATA" then
                     computer.pushSignal("modem_message", addr, data['s'], data['p'], 0, data['D']['d1'], data['D']['d2'], data['D']['d3'], data['D']['d4'], data['D']['d5'], data['D']['d6'], data['D']['d7'], data['D']['d8'])
+                elseif data['type'] == "WHO?" then
+                    proxy.socket.write(json.encode({type="HELLO", s=proxy.address, op=proxy._openports}).."\n")
                 end
                 proxy.last = computer.uptime()
             end

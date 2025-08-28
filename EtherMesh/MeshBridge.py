@@ -37,6 +37,8 @@ class Client:
                 await self.close()
             decoded = json.loads(data)
             print(decoded)
+            if self.addr == "UNKNOWN":
+               self.logger.critical("WE DON'T KNOW ADDRESS <><><><><><><>")
             match decoded['type']:
                 case "KA":
                     datastr = json.dumps(dict(type="KA"))
@@ -50,10 +52,13 @@ class Client:
                 case "PCLOSE":
                     self.ports.remove(decoded['port'])
                 case "DATA":
-                    self.logger.warning(f"{repr(decoded['D'])}")
+                    if self.addr == "UNKNOWN":
+                        self.writer.write((json.dumps(dict(type="WHO?"))+"\n").encode("utf-8") )
+                        await self.writer.drain()
+                    # self.logger.warning(f"{repr(decoded['D'])}")
                     if decoded['d'] == "BROADCAST":
                         await self.Manager.broadcast(self, decoded['p'], decoded['D'])
-                        self.logger.info(f"Broadcasting to the rest: {decoded}")
+                        #self.logger.info(f"Broadcasting to the rest: {decoded}")
                     else:
                         await self.Manager.direct(self, decoded['d'], decoded['p'], decoded['D'])
                         self.logger.info(f"Sending direct to {decoded['d']}")

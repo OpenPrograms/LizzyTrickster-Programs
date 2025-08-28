@@ -4,31 +4,6 @@ import json
 
 logging.basicConfig(level=logging.DEBUG)
 
-def decode(thing: bytes) -> dict|bool:
-    total_length_target = thing[1]
-    total_length = len(thing[2:])
-    if total_length_target != total_length:
-        print(f"TRUNCATED!? Expected {total_length_target} got {total_length}")
-        return False
-    number_of_segments = thing[2]
-    print(f"{total_length=},{number_of_segments=}")
-    segments = list()
-    if number_of_segments == 0:
-        return dict(segments=segments, total=0)
-    current_bit_pos = 4
-    while True:
-        length = thing[current_bit_pos]
-        data_type = thing[current_bit_pos+1]
-        data = thing[current_bit_pos+2:current_bit_pos+2+length]
-        #print("INLOOP", current_bit_pos, total_length, current_bit_pos+length, "::", length, data_type, data )
-        segments.append( (length, data_type, data) )
-        if current_bit_pos+length == total_length:
-            break
-        current_bit_pos = current_bit_pos+3+length
-    if len(segments) != number_of_segments:
-        print(f"ERR? Expected {number_of_segments} segments, got {len(segments)})")
-    return dict(segments=segments, total=number_of_segments)
-
 
 class Client:
     def __init__(self, Manager: 'ClientManager', reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -92,6 +67,8 @@ class Client:
                     datastr = json.dumps( dict(type="DATA", s=data_to_send['source'], p=data_to_send['port'], D=data_to_send['data']))
                 except TimeoutError:
                     datastr = json.dumps(dict(type="KA"))
+                except asyncio.CancelledError:
+                    break
                 except:
                     self.logger.exception("in writing loop!")
                 self.writer.write((datastr+"\n").encode("utf-8"))

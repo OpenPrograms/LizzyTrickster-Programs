@@ -45,7 +45,7 @@ class Client:
         self.closed = True
 
     def __str__(self):
-        return f"{[self.client_addr, self.addr, self.closed]}"
+        return f"<Client {[self.client_addr, self.addr, self.closed]}>"
 
     async def read_loop(self):
         while True:

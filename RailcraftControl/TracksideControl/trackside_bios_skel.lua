@@ -1,0 +1,6 @@
+@insert "bios_src/microtel-3-mini.lua"
+@insert "bios_src/microtel-4-mini.lua"
+@insert "bios_src/microtel-5-core-mini.lua"
+@insert "bios_src/microtel-5-open-mini.lua"
+@insert "bios_src/fget-mini.lua"
+@insert "bios_src/trackside_code-mini.lua"

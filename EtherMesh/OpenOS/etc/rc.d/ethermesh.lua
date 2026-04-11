@@ -3,7 +3,6 @@ local serial = require "serialization"
 local component = require "component"
 local computer = require "computer"
 local event = require "event"
-local json = require "json"
 
 local cfg = {}
 cfg.peers = {}
@@ -34,21 +33,42 @@ end
 
 local function createMesh(host,port,addr)
     local proxy = {address=addr,buffer="", _openports={}}
+    function proxy._sendToBridge(data)
+        return proxy.socket.write( string.pack("<H", #data)..data )
+    end
     function proxy.connect()
+        print("DEBUG: CONNECT STARTING")
         if proxy.socket then
             proxy.socket.close()
+            print("DEBUG: existing connection close")
         end
         proxy.socket = component.internet.connect(host,port)
         local st = computer.uptime()
         repeat
-            coroutine.yield()
+            os.sleep()
         until proxy.socket.finishConnect() or computer.uptime() > st+5
-        proxy.socket.write(json.encode({type="HELLO", s=proxy.address, op=proxy._openports}).."\n")
+        local finalstr = string.pack("< B c36", 2, proxy.address)
+        proxy._sendToBridge( finalstr )
     end
-    function proxy.send(dest, port, d1,d2,d3,d4,d5,d6,d7,d8)
+    function proxy.send(dest, port, ...)
+        local args = {...}
         rt = 0
-        data_to_send = {type="DATA", s=proxy.address, d=dest, p=port, D={d1=d1,d2=d2,d3=d3,d4=d4,d5=d5,d6=d6,d7=d7,d8=d8} } -- stupid table.pack / serialization issues
-        while not proxy.socket.write(json.encode(data_to_send).."\n") and rt < 10 do
+        local finalstr, argstr, argCount = "", "", #args
+        for i=1,argCount do
+            local arg = args[i] -- Why am i setting it local here? Maybe to make the code more readable?
+            local argType = type(arg)
+            if argType == "string" then -- type 1
+                argstr = argstr..string.pack("< B s", 1, arg)
+            elseif argType == "number" then -- type 2
+                argstr = argstr..string.pack("< B n", 2, arg)
+            elseif argType == "boolean" then -- type 3
+                argstr = argstr..string.pack("< B B", 3, (arg and 1 or 0))
+            elseif argType == "nil" then -- type 4
+                argstr = argstr..string.pack("<B x", 4)
+            end
+        end
+        local finalstr = string.pack("< B c36 c36 H H B ", 5, proxy.address, dest, port, #argstr, argCount)..argstr
+        while not proxy._sendToBridge(finalstr) and rt < 10 do
             proxy.connect()
             rt = rt + 1
         end
@@ -59,35 +79,72 @@ local function createMesh(host,port,addr)
     end
 
     function proxy.read(event, cardId, connectionId)
-        local rb, r
-        local buffer = ""
+        if connectionId ~= proxy.socket.id() then return end -- not our socket, we don't care
+
+        local readbuffer, result
         while true do
-            rb,r = proxy.socket.read(4096)
-            if type(rb) == "nil" then
+            readbuffer, result = proxy.socket.read(4096) -- what is result?
+            if type(readbuffer) == "nil" then
                 proxy.connect()
             end
-            if #rb == 0 and #buffer == 0 then
+            if #readbuffer == 0 and #proxy.buffer == 0 then -- this probably shouldn't ever happen
                 -- Buffer empty and no actual data, return early
                 return
             end
-            buffer = buffer..rb
-            if #buffer > 0 and #rb == 0 then
+            proxy.buffer = proxy.buffer..readbuffer -- append the acquired data to the main buffer
+            if #proxy.buffer > 0 and #readbuffer == 0 then
+                -- no more data left in the socket, lets break out of the while loop and continue on
                 break
             end
+            -- maybe put an os.sleep() here?
         end
-        if #buffer > 0 then
-            for dataline in string.gmatch(buffer, '([^'.."\n"..']+)') do
-                data = json.decode(dataline)
-                if data['type'] == "DATA" then
-                    computer.pushSignal("modem_message", addr, data['s'], data['p'], 0, data['D']['d1'], data['D']['d2'], data['D']['d3'], data['D']['d4'], data['D']['d5'], data['D']['d6'], data['D']['d7'], data['D']['d8'])
-                elseif data['type'] == "WHO?" then
-                    proxy.socket.write(json.encode({type="HELLO", s=proxy.address, op=proxy._openports}).."\n")
+        while true do
+            if #proxy.buffer == 0 then break end -- early bail out if we've looped back up here and emptieid the buffer entirely
+            local packetLen, bufferOffset = string.unpack("< H", proxy.buffer)
+            if #proxy.buffer < packetLen then
+                -- buffer doesn't have at least 1 full packet. bail out early cause the data will probably come in soon
+                break
+            elseif #proxy.buffer >= packetLen then -- we have enough to decode at least one packet
+                local bufferLine = proxy.buffer:sub(bufferOffset, packetLen + bufferOffset - 1 )
+                proxy.buffer = proxy.buffer:sub(packetLen + bufferOffset) -- remove the current packet from the buffer
+                local pType, data, saddr, port, lenArgs, countArgs, args
+                local nextOffset = 0
+                pType, nextOffset = string.unpack("< B", bufferLine)
+                if pType == 1 then -- KA
+                    proxy._sendToBridge( string.pack("<Bx", 1) )
+                elseif pType == 2 then -- HELLO -- technically not HELLO in this direction, but EtherMesh inquiring who this is (if it didn't yet get sent)
+                    proxy._sendToBridge( string.pack("< B c36", 2, proxy.address) ) -- same as in proxy.connect() above
+                elseif pType == 3 then -- POPEN -- shouldn't ever actually arrive here
+                    print()
+                elseif pType == 4 then -- PCLOSE -- same as POPEN
+                    print()
+                elseif pType == 5 then -- DATA
+                    saddr, daddr, port, lenArgs, countArgs, nextOffset = string.unpack("< c36 c36 H H B", bufferLine, nextOffset)
+                    args = {}
+                    for i=1,countArgs do
+                        local argType
+                        argType, nextOffset = string.unpack("<B", bufferLine, nextOffset)
+                        if argType == 1 then -- string
+                            data, nextOffset = string.unpack("<s", bufferLine, nextOffset)
+                            args[#args+1] = data
+                        elseif argType == 2 then -- number
+                            data, nextOffset = string.unpack("<n", bufferLine, nextOffset)
+                            args[#args+1] = data
+                        elseif argType == 3 then -- boolean
+                            data, nextOffset = string.unpack("<B", bufferLine, nextOffset)
+                            args[#args+1] = (data==1 and true or false)
+                        elseif argType == 4 then -- nil
+                            nextOffset = string.unpack("<x", bufferLine, nextOffset)
+                            args[#args+1] = nil
+                        end
+                    end
+                    computer.pushSignal("modem_message", addr, saddr, port, 0, table.unpack(args))
                 end
-                proxy.last = computer.uptime()
             end
+            proxy.last = computer.uptime()
         end
         if computer.uptime() > proxy.last + cfg.katimer then
-            proxy.socket.write(json.encode({type="KA", s=addr}).."\n" )
+            proxy._sendToBridge( string.pack("<Bx", 1).."\r\n" )
             proxy.last = computer.uptime()
         end
     end
@@ -105,12 +162,12 @@ local function createMesh(host,port,addr)
         return 8192
     end
     function proxy.open(port)
-        proxy.socket.write(json.encode({type="POPEN", port=port}).."\n")
+        proxy._sendToBridge( string.pack("< B H", 3, port) )
         -- TODO: note open ports in proxy._openports in the event that we reconnect
         return true
     end
     function proxy.close(port)
-        proxy.socket.write(json.encode({type="PCLOSE", port=port}).."\n")
+        proxy._sendToBridge( string.pack("< B H", 4, port) )
         return true
     end
     event.listen("internet_ready",proxy.read)

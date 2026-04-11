@@ -1,34 +1,42 @@
 import asyncio
 import logging
-import json
 import coloredlogs
-import luadata
-import random
 import copy
+import struct
+from enum import IntEnum
 
 #logging.basicConfig(level=logging.DEBUG)
 log_format = "%(asctime)s %(name)s %(levelname)s %(message)s"
 fstyles = coloredlogs.DEFAULT_FIELD_STYLES | {'levelname':dict(bold=True, color="cyan")}
 coloredlogs.install(level=logging.DEBUG, fmt=log_format, field_styles = fstyles)
 
+def getPacketType(bytestr: bytes) -> int:
+    return struct.unpack_from("<B", bytestr)[0]
+
+class PacketType(IntEnum):
+    KA = 1
+    HE = 2
+    PO = 3
+    PC = 4
+    DA = 5
+
+
 class Client:
     def __init__(self, Manager: 'ClientManager', reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         self.Manager = Manager
         self.client_addr = writer.get_extra_info('peername')
-        #self.logger = Manager.logger.getChild(f"{self.client_addr[0]}#{self.client_addr[1]}")
-        self.reader = reader
-        self.writer = writer
-        self.outqueue = asyncio.Queue()
+        self.reader: asyncio.StreamReader = reader
+        self.writer: asyncio.StreamWriter = writer
+        self.outqueue: asyncio.Queue[bytes] = asyncio.Queue()
         self.tasks: set[asyncio.Task] = set()
-        self.addr = "UNKNOWN"
+        self.addr: bytes = b"UNKNOWN"
         self.ports: set[int] = set()
-        self.closed = False
+        self.closed: bool = False
         self.logger.info("New client!")
 
     @property
     def logger(self) -> logging.Logger:
-        addr = getattr(self, 'addr', "UNKNOWN")
-        return logging.getLogger(f"Client.{self.addr}@{self.client_addr[0]}#{self.client_addr[1]}")
+        return logging.getLogger(f"Client.{self.addr.decode('UTF-8')}@{self.client_addr[0]}#{self.client_addr[1]}")
     
     async def start(self):
         self.tasks.add(asyncio.create_task(self.read_loop()))
@@ -39,7 +47,6 @@ class Client:
         try:
             for task in self.tasks:
                 task.cancel()
-                #self.logger.debug(f"Cancelled {task}")
         except:
             self.logger.exception("Failed to cancel tasks?")
         self.closed = True
@@ -48,52 +55,64 @@ class Client:
         return f"<Client {[self.client_addr, self.addr, self.closed]}>"
 
     async def read_loop(self):
+        buffer = bytes()
         while True:
-            data = (await self.reader.readline()).decode("utf-8")
-            if len(data) == 0:
-                self.logger.info("Lost client!")
-                await self.close()
-            decoded = json.loads(data)
-            if self.addr == "UNKNOWN":
-               self.logger.critical("WE DON'T KNOW ADDRESS <><><><><><><>")
-            match decoded['type']:
-                case "KA":
-                    datastr = json.dumps(dict(type="KA"))
-                    self.writer.write((datastr+"\n").encode("utf-8"))
-                    await self.writer.drain()
-                case "HELLO":
-                    self.addr = decoded['s']
-                    [self.ports.add(port) for port in decoded['op']]
-                case "POPEN":
-                    self.ports.add(decoded['port'])
-                case "PCLOSE":
-                    self.ports.remove(decoded['port'])
-                case "DATA":
-                    if self.addr == "UNKNOWN":
-                        self.writer.write((json.dumps(dict(type="WHO?"))+"\n").encode("utf-8") )
-                        await self.writer.drain()
-                    # self.logger.warning(f"{repr(decoded['D'])}")
-                    if decoded['d'] == "BROADCAST":
-                        await self.Manager.broadcast(self, decoded['p'], decoded['D'])
-                        #self.logger.info(f"Broadcasting to the rest: {decoded}")
-                    else:
-                        await self.Manager.direct(self, decoded['d'], decoded['p'], decoded['D'])
-                        self.logger.info(f"Sending direct to {decoded['d']}")
+            try:
+                data: bytes = await self.reader.read(4096)
+                if len(data) == 0:
+                    self.logger.info("Lost client")
+                    await self.close()
+                    break # read() blocks until there is data, if it returns 0, we lost the client and might as well stop processing packets
+                buffer = buffer + data
+                packetLength: int = struct.unpack_from("<H", buffer)[0] # 2 bytes
+                self.logger.debug( f"Inbound packet length is {packetLength}" )
+                if len(buffer) + 2 < packetLength: # If the buffer is less than a full packet
+                    continue
+                packet: bytes = buffer[2:packetLength + 2] # Discard the 2 bytes at the start that specify the length, get until the end of the packet + the length
+                await self.process_packet( packet )
+                buffer = buffer[packetLength + 2 :] # Truncate the packet we just got out of the buffer
+
+            except asyncio.CancelledError:
+                break
+
+
+    async def queue_packet(self, packet: bytes):
+        await self.outqueue.put( struct.pack("<H", len(packet)) + packet )
+
+
+    async def process_packet(self, packet: bytes):
+        offset: int = 0
+        match pType := getPacketType(packet):
+            case PacketType.HE: # Hello packet
+                self.addr = struct.unpack_from("<36s", packet, offset=1)[0]
+                await self.queue_packet( struct.pack("<Bx", 1) )
+            case PacketType.DA: # Data
+                daddr: bytes
+                port: int
+                self.addr, daddr, port = struct.unpack_from("<36s 36s H", packet, offset=offset+1) # Offset is 0 above, but we already read 1 byte when getting the type
+                if daddr.startswith(b"BROADCAST"):
+                    await self.Manager.broadcast(self, port, packet)
+                else:
+                    await self.Manager.direct(self, daddr, port, packet)
+            case PacketType.PO | PacketType.PC: # Port stuff
+                port: int = struct.unpack_from("<H", packet, offset=1)[0]
+                if pType == PacketType.PO:
+                    self.ports.add(port)
+                else:
+                    self.ports.remove(port)
     
     async def write_loop(self):
         while True:
             try:
                 try:
-                    data_to_send = await asyncio.wait_for(self.outqueue.get(), timeout=10.0)
-                    #self.logger.critical(data_to_send)
-                    datastr = json.dumps( dict(type="DATA", s=data_to_send['source'], p=data_to_send['port'], D=data_to_send['data']))
+                    data_to_send: bytes = await asyncio.wait_for(self.outqueue.get(), timeout=60.0)
+                    self.writer.write(data_to_send)
                 except TimeoutError:
-                    datastr = json.dumps(dict(type="KA"))
+                    await self.queue_packet( struct.pack("<Bx", 1) ) # KeepAlive
                 except asyncio.CancelledError:
                     break
                 except:
                     self.logger.exception("in writing loop!")
-                self.writer.write((datastr+"\n").encode("utf-8"))
                 await self.writer.drain()
             except asyncio.CancelledError:
                 self.logger.warning("Write task cancelled!")
@@ -105,6 +124,11 @@ class Client:
                 await self.close()
                 break
 
+class ArgType(IntEnum):
+    STRING = 1
+    NUMBER = 2
+    BOOLEAN = 3
+    NIL = 4
 
 
 class ClientManager:
@@ -133,21 +157,19 @@ class ClientManager:
         self.clients.add(c)
         await c.start()
 
-    #async def close_client(self, client: Client):
-    #    self.clients.remove(client)
-    #    del client
-
-    async def broadcast(self, sending_client: Client, port: int, data: str):
+    async def broadcast(self, sending_client: Client, port: int, dataline: bytes):
         for client in self.clients:
             if client is sending_client or client.addr == sending_client.addr: 
                 continue
-            self.logger.debug(f"{sending_client.addr} =>> {client.addr}")
-            await client.outqueue.put(dict(source=sending_client.addr, port=port, data=data) )
-    async def direct(self, sending_client: Client, destination: str, port: int, data: str):
+            if port in client.ports:
+                self.logger.debug(f"{sending_client.addr} =>> {client.addr}")
+                await client.outqueue.put( struct.pack("<H", len(dataline)) + dataline)
+    async def direct(self, sending_client: Client, destination: bytes, port: int, dataline: bytes):
         for client in self.clients:
-            if client.addr == destination:
+            if client.addr == destination and port in client.ports:
                 self.logger.debug(f"{sending_client.addr} -> {destination}")
-                await client.outqueue.put(dict(source=sending_client.addr, port=port, data=data) )
+                await client.outqueue.put( struct.pack("<H", len(dataline)) + dataline)
+                break # don't need to continue looping over clients
         
 
 

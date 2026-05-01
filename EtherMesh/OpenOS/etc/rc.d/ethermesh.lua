@@ -58,7 +58,7 @@ local function createMesh(host,port,addr)
             local arg = args[i] -- Why am i setting it local here? Maybe to make the code more readable?
             local argType = type(arg)
             if argType == "string" then -- type 1
-                argstr = argstr..string.pack("< B s", 1, arg)
+                argstr = argstr..string.pack("< B s2", 1, arg) -- Use 2 bytes for string length as most string args will be less than 8192 chars, 1 is too small
             elseif argType == "number" then -- type 2
                 argstr = argstr..string.pack("< B n", 2, arg)
             elseif argType == "boolean" then -- type 3
@@ -125,7 +125,7 @@ local function createMesh(host,port,addr)
                         local argType
                         argType, nextOffset = string.unpack("<B", bufferLine, nextOffset)
                         if argType == 1 then -- string
-                            data, nextOffset = string.unpack("<s", bufferLine, nextOffset)
+                            data, nextOffset = string.unpack("<s2", bufferLine, nextOffset)
                             args[#args+1] = data
                         elseif argType == 2 then -- number
                             data, nextOffset = string.unpack("<n", bufferLine, nextOffset)

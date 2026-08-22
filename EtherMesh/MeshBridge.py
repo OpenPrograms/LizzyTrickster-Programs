@@ -41,6 +41,7 @@ class Client:
     async def start(self):
         self.tasks.add(asyncio.create_task(self.read_loop()))
         self.tasks.add(asyncio.create_task(self.write_loop()))
+        self.tasks.add(asyncio.create_task(self.check_loop()))
 
     async def close(self):
         self.logger.warning("CLOSING")
@@ -53,6 +54,18 @@ class Client:
 
     def __str__(self):
         return f"<Client {[self.client_addr, self.addr, self.closed]}>"
+
+    async def check_loop(self):
+        do_we_have_client: bool = False
+        for i in range(5):
+            await asyncio.sleep(10)
+            if self.addr != b"UNKNOWN":
+                do_we_have_client = True
+                break
+            self.logger.warning("Don't know client's address yet")
+        if do_we_have_client == False:
+            self.logger.warning("Couldn't determine client's address, closing")
+            await self.close()
 
     async def read_loop(self):
         buffer = bytes()
